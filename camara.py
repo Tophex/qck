@@ -1,32 +1,49 @@
-import face_recognition
-import numpy as np
-from picamera2 import Picamera2
+import sys
+# Asegúrate de especificar la ruta solo si es necesario
+# sys.path.append('/ruta/a/tu/opencv')
+import cv2
+import time
+from picamera2 import Picamera2, Preview
 
 # Inicializa la cámara
 picam2 = Picamera2()
-picam2.configure(picam2.preview_configuration(main={"format": 'RGB888', "size": (640, 480)}))
+
+# Configura la vista previa
+preview_config = picam2.create_preview_configuration()
+picam2.configure(preview_config)
+
+# Inicia la vista previa
+picam2.start_preview(Preview.QT)
+
+# Inicia la cámara
 picam2.start()
+
+# Carga el clasificador de Haar para la detección de rostros
+haarcascade_path = '/home/usc/Desktop/haarcascades/haarcascade_frontalface_default.xml'
+face_cascade = cv2.CascadeClassifier(haarcascade_path)
 
 try:
     while True:
-        # Captura un frame
-        frame = picam2.capture_array()
+        # Captura el frame
+        frame = picam2.capture_array()  # Captura un frame como un array de NumPy
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  # Convierte a escala de grises
+        
+        # Detección de rostros
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
 
-        # Convierte la imagen a un formato adecuado para face_recognition
-        rgb_frame = frame[:, :, ::-1]  # Cambia de BGR a RGB
+        # Dibuja rectángulos alrededor de los rostros detectados
+        for (x, y, w, h) in faces:
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
 
-        # Encuentra todas las caras en la imagen
-        face_locations = face_recognition.face_locations(rgb_frame)
+        # Muestra el frame con detección de rostros
+        cv2.imshow('Detección de Rostros', frame)
 
-        # Dibuja rectángulos alrededor de las caras detectadas
-        for (top, right, bottom, left) in face_locations:
-            picam2.set_preview_crop(left, top, right - left, bottom - top)
-
-        # Aquí puedes agregar código para mostrar el frame o procesar las imágenes de otras maneras
-
-        # Salida del bucle al presionar 'q' (puedes usar otro método para salir)
-        if input() == 'q':
+        # Sale del bucle si se presiona 'q'
+        if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
+except KeyboardInterrupt:
+    print("Captura Detenida.")
 finally:
-    picam2.close()
+    picam2.stop()
+    cv2.destroyAllWindows()  # Cierra las ventanas de OpenCV
