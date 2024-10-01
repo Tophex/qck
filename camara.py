@@ -1,46 +1,42 @@
 import cv2
-import os
+import numpy as np
+import picamera
+import picamera.array
 
-# Carga el clasificador de caras
-haarcascade_path = os.path.join(cv2.__file__, '..', 'data', 'haarcascades', 'haarcascade_frontalface_default.xml')
-face_cascade = cv2.CascadeClassifier(haarcascade_path)
+# Carga el clasificador de caras preentrenado de Haar
+face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
-# Verifica si se cargó correctamente el clasificador
-if face_cascade.empty():
-    print("Error: No se pudo cargar el clasificador de caras.")
-    exit()
+# Inicializa la cámara
+with picamera.PiCamera() as camera:
+    # Establece la resolución de la cámara
+    camera.resolution = (640, 480)
+    camera.framerate = 24
 
-# Inicia la captura de video desde la cámara
-cap = cv2.VideoCapture(0)
+    # Usa un array de numpy para almacenar los frames
+    with picamera.array.PiRGBArray(camera) as output:
+        for frame in camera.capture_continuous(output, format='bgr', use_video_port=True):
+            # Obtén el frame actual
+            image = frame.array
 
-# Verifica si la cámara se abrió correctamente
-if not cap.isOpened():
-    print("Error: No se pudo abrir la cámara.")
-    exit()
+            # Convierte el frame a escala de grises
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-while True:
-    # Captura un fotograma
-    ret, frame = cap.read()
-    if not ret:
-        print("Error: No se pudo capturar el video.")
-        break
+            # Detecta caras
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
 
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            # Dibuja rectángulos alrededor de las caras detectadas
+            for (x, y, w, h) in faces:
+                cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
 
-    # Detecta caras
-    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
+            # Muestra el frame con las detecciones
+            cv2.imshow('Face Detection', image)
 
-    # Dibuja rectángulos alrededor de las caras detectadas
-    for (x, y, w, h) in faces:
-        cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
+            # Limpia el array para el siguiente frame
+            output.truncate(0)
 
-    # Muestra el fotograma con las caras detectadas
-    cv2.imshow('Face Detection', frame)
+            # Sale del bucle al presionar 'q'
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
 
-    # Salir si se presiona 'q'
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-# Libera la captura y cierra las ventanas
-cap.release()
+# Cierra todas las ventanas al finalizar
 cv2.destroyAllWindows()
