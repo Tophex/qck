@@ -1,42 +1,32 @@
-import cv2
+import face_recognition
 import numpy as np
-import picamera
-import picamera.array
-
-# Carga el clasificador de caras preentrenado de Haar
-face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+from picamera2 import Picamera2
 
 # Inicializa la cámara
-with picamera.PiCamera() as camera:
-    # Establece la resolución de la cámara
-    camera.resolution = (640, 480)
-    camera.framerate = 24
+picam2 = Picamera2()
+picam2.configure(picam2.preview_configuration(main={"format": 'RGB888', "size": (640, 480)}))
+picam2.start()
 
-    # Usa un array de numpy para almacenar los frames
-    with picamera.array.PiRGBArray(camera) as output:
-        for frame in camera.capture_continuous(output, format='bgr', use_video_port=True):
-            # Obtén el frame actual
-            image = frame.array
+try:
+    while True:
+        # Captura un frame
+        frame = picam2.capture_array()
 
-            # Convierte el frame a escala de grises
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        # Convierte la imagen a un formato adecuado para face_recognition
+        rgb_frame = frame[:, :, ::-1]  # Cambia de BGR a RGB
 
-            # Detecta caras
-            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
+        # Encuentra todas las caras en la imagen
+        face_locations = face_recognition.face_locations(rgb_frame)
 
-            # Dibuja rectángulos alrededor de las caras detectadas
-            for (x, y, w, h) in faces:
-                cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
+        # Dibuja rectángulos alrededor de las caras detectadas
+        for (top, right, bottom, left) in face_locations:
+            picam2.set_preview_crop(left, top, right - left, bottom - top)
 
-            # Muestra el frame con las detecciones
-            cv2.imshow('Face Detection', image)
+        # Aquí puedes agregar código para mostrar el frame o procesar las imágenes de otras maneras
 
-            # Limpia el array para el siguiente frame
-            output.truncate(0)
+        # Salida del bucle al presionar 'q' (puedes usar otro método para salir)
+        if input() == 'q':
+            break
 
-            # Sale del bucle al presionar 'q'
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-
-# Cierra todas las ventanas al finalizar
-cv2.destroyAllWindows()
+finally:
+    picam2.close()
